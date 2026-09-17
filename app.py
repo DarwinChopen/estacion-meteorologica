@@ -1,10 +1,27 @@
-from flask import Flask, render_template_string
-from datetime import datetime
+import os
+
+from flask import Flask, render_template_string, request, jsonify
+from datetime import datetime, timezone
 
 app = Flask(__name__)
 
+API_KEY = os.environ.get("API_KEY", "clave-prueba-local")
+
+datos_estacion = {
+    "temperatura": 24.5,
+    "humedad": 65,
+    "presion": 1013.2,
+    "velocidad_viento": 12.4,
+    "direccion_viento": "NE",
+    "lluvia": 3.2,
+    "sensacion": 25.1,
+    "ultima_actualizacion": "--:--:--"
+}
+
+ultima_recepcion = None
 HTML = """
 <!DOCTYPE html>
+
 <html lang="es">
 
 <head>
@@ -15,6 +32,7 @@ HTML = """
           content="width=device-width, initial-scale=1.0">
 
     <title>Estación Meteorológica</title>
+
 
     <style>
 
@@ -60,7 +78,9 @@ HTML = """
         .encabezado {
 
             display: flex;
+
             justify-content: space-between;
+
             align-items: center;
 
             flex-wrap: wrap;
@@ -72,6 +92,7 @@ HTML = """
         .titulo h1 {
 
             font-size: 40px;
+
             font-weight: 700;
         }
 
@@ -96,7 +117,8 @@ HTML = """
 
             border-radius: 30px;
 
-            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+            box-shadow:
+                0 5px 20px rgba(0,0,0,0.15);
         }
 
 
@@ -108,11 +130,17 @@ HTML = """
         }
 
 
+        .offline {
+
+            color: #fca5a5;
+
+            font-weight: bold;
+        }
+
 
         /* =========================
            PANEL PRINCIPAL
         ========================= */
-
 
         .principal {
 
@@ -174,11 +202,9 @@ HTML = """
         }
 
 
-
         /* =========================
            TARJETAS
         ========================= */
-
 
         .tarjetas {
 
@@ -217,8 +243,9 @@ HTML = """
         }
 
 
-        /* COLORES DE LAS TARJETAS */
-
+        /* =========================
+           COLORES DE TARJETAS
+        ========================= */
 
         .humedad {
 
@@ -286,7 +313,6 @@ HTML = """
         }
 
 
-
         .icono {
 
             font-size: 43px;
@@ -333,17 +359,16 @@ HTML = """
         }
 
 
-
         /* =========================
            INFORMACIÓN DEL SISTEMA
         ========================= */
-
 
         .sistema {
 
             margin-top: 25px;
 
-            background: rgba(255,255,255,0.16);
+            background:
+                rgba(255,255,255,0.16);
 
             backdrop-filter: blur(12px);
 
@@ -380,7 +405,6 @@ HTML = """
         }
 
 
-
         footer {
 
             text-align: center;
@@ -393,11 +417,9 @@ HTML = """
         }
 
 
-
         /* =========================
            DISEÑO PARA CELULAR
         ========================= */
-
 
         @media(max-width:600px) {
 
@@ -438,22 +460,24 @@ HTML = """
 </head>
 
 
-
 <body>
 
 
 <div class="contenedor">
 
 
-    <!-- ENCABEZADO -->
-
+    <!-- =========================
+         ENCABEZADO
+    ========================== -->
 
     <div class="encabezado">
 
 
         <div class="titulo">
 
-            <h1>🌦️ Estación Meteorológica</h1>
+            <h1>
+                🌦️ Estación Meteorológica
+            </h1>
 
             <p>
                 Sistema de monitoreo ambiental en tiempo real
@@ -466,8 +490,11 @@ HTML = """
 
             ESP32-S3
 
-            <span class="online">
-                ● EN LÍNEA
+            <span id="estado-superior"
+                  class="offline">
+
+                ● DESCONECTADO
+
             </span>
 
         </div>
@@ -476,21 +503,28 @@ HTML = """
     </div>
 
 
-
-    <!-- PANEL PRINCIPAL -->
-
+    <!-- =========================
+         TEMPERATURA
+    ========================== -->
 
     <div class="principal">
 
 
         <div class="principal-info">
 
-            <h2>Temperatura actual</h2>
+
+            <h2>
+                Temperatura actual
+            </h2>
 
 
             <div class="temperatura">
 
-                {{ temperatura }} °C
+                <span id="temperatura">
+                    {{ temperatura }}
+                </span>
+
+                °C
 
             </div>
 
@@ -515,34 +549,44 @@ HTML = """
     </div>
 
 
-
-    <!-- TARJETAS -->
-
+    <!-- =========================
+         TARJETAS
+    ========================== -->
 
     <div class="tarjetas">
 
 
         <!-- HUMEDAD -->
 
-
         <div class="tarjeta humedad">
 
+
             <div class="icono">
+
                 💧
+
             </div>
 
 
             <h3>
+
                 Humedad relativa
+
             </h3>
 
 
             <div class="dato">
 
-                {{ humedad }}
+                <span id="humedad">
+
+                    {{ humedad }}
+
+                </span>
 
                 <span class="unidad">
+
                     %
+
                 </span>
 
             </div>
@@ -554,31 +598,42 @@ HTML = """
 
             </div>
 
+
         </div>
 
 
-
-        <!-- PRESION -->
-
+        <!-- PRESIÓN -->
 
         <div class="tarjeta presion">
 
+
             <div class="icono">
+
                 🌬️
+
             </div>
 
 
             <h3>
+
                 Presión atmosférica
+
             </h3>
 
 
             <div class="dato">
 
-                {{ presion }}
+                <span id="presion">
+
+                    {{ presion }}
+
+                </span>
+
 
                 <span class="unidad">
+
                     hPa
+
                 </span>
 
             </div>
@@ -590,31 +645,42 @@ HTML = """
 
             </div>
 
+
         </div>
 
 
-
-        <!-- VELOCIDAD VIENTO -->
-
+        <!-- VELOCIDAD DEL VIENTO -->
 
         <div class="tarjeta viento">
 
+
             <div class="icono">
+
                 💨
+
             </div>
 
 
             <h3>
+
                 Velocidad del viento
+
             </h3>
 
 
             <div class="dato">
 
-                {{ velocidad_viento }}
+                <span id="velocidad_viento">
+
+                    {{ velocidad_viento }}
+
+                </span>
+
 
                 <span class="unidad">
+
                     km/h
+
                 </span>
 
             </div>
@@ -626,28 +692,36 @@ HTML = """
 
             </div>
 
+
         </div>
 
 
-
-        <!-- DIRECCION -->
-
+        <!-- DIRECCIÓN DEL VIENTO -->
 
         <div class="tarjeta direccion">
 
+
             <div class="icono">
+
                 🧭
+
             </div>
 
 
             <h3>
+
                 Dirección del viento
+
             </h3>
 
 
             <div class="dato">
 
-                {{ direccion_viento }}
+                <span id="direccion_viento">
+
+                    {{ direccion_viento }}
+
+                </span>
 
             </div>
 
@@ -658,31 +732,42 @@ HTML = """
 
             </div>
 
-        </div>
 
+        </div>
 
 
         <!-- LLUVIA -->
 
-
         <div class="tarjeta lluvia">
 
+
             <div class="icono">
+
                 🌧️
+
             </div>
 
 
             <h3>
+
                 Precipitación
+
             </h3>
 
 
             <div class="dato">
 
-                {{ lluvia }}
+                <span id="lluvia">
+
+                    {{ lluvia }}
+
+                </span>
+
 
                 <span class="unidad">
+
                     mm
+
                 </span>
 
             </div>
@@ -694,31 +779,42 @@ HTML = """
 
             </div>
 
+
         </div>
 
 
-
-        <!-- SENSACION TERMICA -->
-
+        <!-- SENSACIÓN TÉRMICA -->
 
         <div class="tarjeta sensacion">
 
+
             <div class="icono">
+
                 🌡️
+
             </div>
 
 
             <h3>
+
                 Sensación térmica
+
             </h3>
 
 
             <div class="dato">
 
-                {{ sensacion }}
+                <span id="sensacion">
+
+                    {{ sensacion }}
+
+                </span>
+
 
                 <span class="unidad">
+
                     °C
+
                 </span>
 
             </div>
@@ -730,15 +826,16 @@ HTML = """
 
             </div>
 
+
         </div>
 
 
     </div>
 
 
-
-    <!-- INFORMACION DEL SISTEMA -->
-
+    <!-- =========================
+         INFORMACIÓN DEL SISTEMA
+    ========================== -->
 
     <div class="sistema">
 
@@ -775,8 +872,11 @@ HTML = """
                 Estado
             </span>
 
-            <strong class="online">
-                ● Conectado
+            <strong id="estado-inferior"
+                    class="offline">
+
+                ● Desconectado
+
             </strong>
 
         </div>
@@ -785,18 +885,26 @@ HTML = """
         <div>
 
             <span>
+
                 Última actualización
+
             </span>
 
+
             <strong>
-                {{ hora }}
+
+                <span id="ultima_actualizacion">
+
+                    {{ hora }}
+
+                </span>
+
             </strong>
 
         </div>
 
 
     </div>
-
 
 
     <footer>
@@ -809,65 +917,344 @@ HTML = """
 </div>
 
 
+<!-- =====================================================
+     JAVASCRIPT
+     ACTUALIZACIÓN AUTOMÁTICA
+====================================================== -->
+
+<script>
+
+
+    async function actualizarDatos() {
+
+
+        try {
+
+
+            // ==========================================
+            // CONSULTAR API
+            // ==========================================
+
+            const respuesta =
+                await fetch("/api/datos");
+
+
+            if (!respuesta.ok) {
+
+                throw new Error(
+                    "No se pudieron obtener los datos"
+                );
+
+            }
+
+
+            const datos =
+                await respuesta.json();
+
+
+            // ==========================================
+            // ACTUALIZAR MEDICIONES
+            // ==========================================
+
+            document
+                .getElementById("temperatura")
+                .textContent =
+                datos.temperatura;
+
+
+            document
+                .getElementById("humedad")
+                .textContent =
+                datos.humedad;
+
+
+            document
+                .getElementById("presion")
+                .textContent =
+                datos.presion;
+
+
+            document
+                .getElementById("velocidad_viento")
+                .textContent =
+                datos.velocidad_viento;
+
+
+            document
+                .getElementById("direccion_viento")
+                .textContent =
+                datos.direccion_viento;
+
+
+            document
+                .getElementById("lluvia")
+                .textContent =
+                datos.lluvia;
+
+
+            document
+                .getElementById("sensacion")
+                .textContent =
+                datos.sensacion;
+
+
+            document
+                .getElementById("ultima_actualizacion")
+                .textContent =
+                datos.ultima_actualizacion;
+
+
+            // ==========================================
+            // ESTADO DEL ESP32
+            // ==========================================
+
+            const estadoSuperior =
+                document.getElementById(
+                    "estado-superior"
+                );
+
+
+            const estadoInferior =
+                document.getElementById(
+                    "estado-inferior"
+                );
+
+
+            if (datos.conectado) {
+
+
+                estadoSuperior.textContent =
+                    "● EN LÍNEA";
+
+
+                estadoSuperior.className =
+                    "online";
+
+
+                estadoInferior.textContent =
+                    "● Conectado";
+
+
+                estadoInferior.className =
+                    "online";
+
+
+            }
+
+            else {
+
+
+                estadoSuperior.textContent =
+                    "● DESCONECTADO";
+
+
+                estadoSuperior.className =
+                    "offline";
+
+
+                estadoInferior.textContent =
+                    "● Desconectado";
+
+
+                estadoInferior.className =
+                    "offline";
+
+
+            }
+
+
+        }
+
+
+        catch (error) {
+
+
+            console.error(
+                "Error actualizando datos:",
+                error
+            );
+
+
+        }
+
+
+    }
+
+
+    // Primera consulta al cargar la página
+
+    actualizarDatos();
+
+
+    // Consultar nuevamente cada 5 segundos
+
+    setInterval(
+        actualizarDatos,
+        5000
+    );
+
+
+</script>
+
+
 </body>
 
 </html>
 """
 
-
 @app.route("/")
 def inicio():
-
-    # =====================================
-    # DATOS DE PRUEBA
-    # Luego serán recibidos desde ESP32-S3
-    # =====================================
-
-    temperatura = 24.5
-
-    humedad = 65
-
-    presion = 1013.2
-
-    velocidad_viento = 12.4
-
-    direccion_viento = "NE"
-
-    lluvia = 3.2
-
-    sensacion = 25.1
-
-
-    hora = datetime.now().strftime("%H:%M:%S")
-
 
     return render_template_string(
 
         HTML,
 
-        temperatura=temperatura,
+        temperatura=datos_estacion["temperatura"],
 
-        humedad=humedad,
+        humedad=datos_estacion["humedad"],
 
-        presion=presion,
+        presion=datos_estacion["presion"],
 
-        velocidad_viento=velocidad_viento,
+        velocidad_viento=datos_estacion[
+            "velocidad_viento"
+        ],
 
-        direccion_viento=direccion_viento,
+        direccion_viento=datos_estacion[
+            "direccion_viento"
+        ],
 
-        lluvia=lluvia,
+        lluvia=datos_estacion["lluvia"],
 
-        sensacion=sensacion,
+        sensacion=datos_estacion["sensacion"],
 
-        hora=hora
+        hora=datos_estacion[
+            "ultima_actualizacion"
+        ]
 
     )
 
 
+
+@app.route("/api/datos", methods=["GET"])
+def obtener_datos():
+
+    conectado = False
+    if ultima_recepcion is not None:
+
+
+        ahora = datetime.now(
+            timezone.utc
+        )
+
+
+        segundos_transcurridos = (
+
+            ahora - ultima_recepcion
+
+        ).total_seconds()
+
+        if segundos_transcurridos <= 30:
+
+            conectado = True
+
+
+    respuesta = datos_estacion.copy()
+
+
+    respuesta["conectado"] = conectado
+
+
+    return jsonify(
+        respuesta
+    )
+
+@app.route("/api/datos", methods=["POST"])
+def recibir_datos():
+
+    global ultima_recepcion
+    clave_recibida = request.headers.get("X-API-Key")
+
+    if clave_recibida != API_KEY:
+
+        return jsonify({
+            "estado": "error",
+            "mensaje": "No autorizado"
+        }), 401
+
+    nuevos_datos = request.get_json(
+        silent=True
+    )
+
+    if not nuevos_datos:
+
+
+        return jsonify({
+
+            "estado": "error",
+
+            "mensaje":
+                "No se recibieron datos"
+
+        }), 400
+
+    campos_permitidos = [
+
+        "temperatura",
+
+        "humedad",
+
+        "presion",
+
+        "velocidad_viento",
+
+        "direccion_viento",
+
+        "lluvia",
+
+        "sensacion"
+
+    ]
+
+    for campo in campos_permitidos:
+
+
+        if campo in nuevos_datos:
+
+
+            datos_estacion[campo] = \
+                nuevos_datos[campo]
+
+    ultima_recepcion = datetime.now(
+        timezone.utc
+    )
+
+    datos_estacion[
+        "ultima_actualizacion"
+    ] = datetime.now().strftime(
+        "%H:%M:%S"
+    )
+
+    return jsonify({
+
+        "estado": "ok",
+
+        "mensaje":
+            "Datos recibidos correctamente",
+
+        "datos":
+            datos_estacion
+
+    })
+
 if __name__ == "__main__":
 
+
     app.run(
+
         host="0.0.0.0",
+
         port=5000,
+
         debug=True
+
     )
