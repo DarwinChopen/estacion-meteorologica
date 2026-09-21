@@ -8,13 +8,13 @@ app = Flask(__name__)
 API_KEY = os.environ.get("API_KEY", "clave-prueba-local")
 
 datos_estacion = {
-    "temperatura": 24.5,
-    "humedad": 65,
-    "presion": 1013.2,
-    "velocidad_viento": 12.4,
-    "direccion_viento": "NE",
-    "lluvia": 3.2,
-    "sensacion": 25.1,
+    "temperatura": 0,
+    "humedad": 0,
+    "presion": 0,
+    "velocidad_viento": 0,
+    "direccion_viento": "--",
+    "lluvia": 0,
+    "sensacion": 0,
     "ultima_actualizacion": "--:--:--"
 }
 
@@ -476,7 +476,7 @@ HTML = """
         <div class="titulo">
 
             <h1>
-                🌦️ Estación Meteorológica
+                🌦️ Estación Meteorológica UDEO 2026 Tele-Datos 2
             </h1>
 
             <p>
