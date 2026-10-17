@@ -856,9 +856,9 @@ HTML = """
             </span>
 
             <strong>
-                Darwin Kevin Panjoj Chopen
-                Keneth Estuardo Gomez Cifuentes
-                Carlos Josue Perez Sanchez
+                Darwin Panjoj Chopen
+                Keneth Gomez Cifuentes
+                Carlos Perez Sanchez
                 
             </strong>        
 
