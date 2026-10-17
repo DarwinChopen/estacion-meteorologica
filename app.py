@@ -847,10 +847,20 @@ HTML = """
             </span>
 
             <strong>
-                ESP32-S3
+                ESP32-S3 Arduino Mega 
             </strong>
 
         </div>
+            <span>
+                Intgrantes:
+            </span>
+
+            <strong>
+                Darwin Kevin Panjoj Chopen
+                Keneth Estuardo Gomez Cifuentes
+                Carlos Josue Perez Sanchez
+                
+            </strong>        
 
 
         <div>
